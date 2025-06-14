@@ -130,15 +130,45 @@ void show3DObjects(std::vector<BoundingBox> &boundingBoxes, cv::Size worldSize, 
     }
 }
 
-void clusterKptMatchesWithROI(BoundingBox &boundingBox, std::vector<cv::KeyPoint> &kptsPrev, std::vector<cv::KeyPoint> &kptsCurr, std::vector<cv::DMatch> &kptMatches)
+void clusterKptMatchesWithROI(
+    BoundingBox &boundingBox,
+    std::vector<cv::KeyPoint> &kptsPrev,
+    std::vector<cv::KeyPoint> &kptsCurr,
+    std::vector<cv::DMatch> &kptMatches)
 {
-  for (auto match : kptMatches)
-  {
-    if (boundingBox.roi.contains(kptsCurr[match.trainIdx].pt))
+    std::vector<cv::DMatch> potentialMatches;
+    std::vector<double> distances;
+
+    // Step 1: Filter matches by whether current keypoint lies inside the bounding box
+    for (auto &match : kptMatches)
     {
-      boundingBox.kptMatches.push_back(match);
+        cv::KeyPoint currKpt = kptsCurr[match.trainIdx];
+        cv::KeyPoint prevKpt = kptsPrev[match.queryIdx];
+
+        if (boundingBox.roi.contains(currKpt.pt))
+        {
+            double dist = cv::norm(currKpt.pt - prevKpt.pt); // Euclidean distance
+            distances.push_back(dist);
+            potentialMatches.push_back(match);
+        }
     }
-  }
+
+    // Step 2: Compute median distance
+    if (distances.empty())
+        return;
+
+    std::vector<double> sorted = distances;
+    std::sort(sorted.begin(), sorted.end());
+    double medianDist = sorted[sorted.size() / 2];
+
+    // Step 3: Filter out matches with large distance deviation
+    for (size_t i = 0; i < potentialMatches.size(); ++i)
+    {
+        if (std::abs(distances[i] - medianDist) < 1.5 * medianDist)
+        {
+            boundingBox.kptMatches.push_back(potentialMatches[i]);
+        }
+    }
 }
 
 // Compute time-to-collision (TTC) based on keypoint correspondences in successive images
