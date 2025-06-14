@@ -1,6 +1,9 @@
 
 #include <numeric>
 #include "matching2D.hpp"
+#include <opencv2/opencv.hpp>
+#include <opencv2/features2d.hpp>
+#include <opencv2/imgproc.hpp>
 
 using namespace std;
 
@@ -40,19 +43,32 @@ void descKeypoints(vector<cv::KeyPoint> &keypoints, cv::Mat &img, cv::Mat &descr
 {
     // select appropriate descriptor
     cv::Ptr<cv::DescriptorExtractor> extractor;
+    
     if (descriptorType.compare("BRISK") == 0)
     {
-
         int threshold = 30;        // FAST/AGAST detection threshold score.
         int octaves = 3;           // detection octaves (use 0 to do single scale)
         float patternScale = 1.0f; // apply this scale to the pattern used for sampling the neighbourhood of a keypoint.
 
         extractor = cv::BRISK::create(threshold, octaves, patternScale);
     }
+    else if (descriptorType.compare("ORB") == 0)
+    {
+        extractor = cv::ORB::create();
+    }
+    else if (descriptorType.compare("AKAZE") == 0)
+    {
+        extractor = cv::AKAZE::create();
+    }
+    else if (descriptorType.compare("SIFT") == 0)
+    {
+        extractor = cv::SIFT::create();
+    }
     else
     {
-
-        //...
+        // Default to BRISK if unknown
+        extractor = cv::BRISK::create();
+        cout << "Unknown descriptor type: " << descriptorType << ", defaulting to BRISK" << endl;
     }
 
     // perform feature description
@@ -63,42 +79,99 @@ void descKeypoints(vector<cv::KeyPoint> &keypoints, cv::Mat &img, cv::Mat &descr
 }
 
 // Detect keypoints in image using the traditional Shi-Thomasi detector
-void detKeypointsShiTomasi(vector<cv::KeyPoint> &keypoints, cv::Mat &img, bool bVis)
-{
-    // compute detector parameters based on image size
-    int blockSize = 4;       //  size of an average block for computing a derivative covariation matrix over each pixel neighborhood
-    double maxOverlap = 0.0; // max. permissible overlap between two features in %
-    double minDistance = (1.0 - maxOverlap) * blockSize;
-    int maxCorners = img.rows * img.cols / max(1.0, minDistance); // max. num. of keypoints
+// Add these functions to your matching2D_Student.cpp file
 
-    double qualityLevel = 0.01; // minimal accepted quality of image corners
+void detKeypointsShiTomasi(std::vector<cv::KeyPoint>& keypoints, cv::Mat& img, bool bVis)
+{
+    // Shi-Tomasi corner detection parameters
+    int maxCorners = 1000;
+    double qualityLevel = 0.01;
+    double minDistance = 10;
+    int blockSize = 3;
+    bool useHarrisDetector = false;
     double k = 0.04;
 
-    // Apply corner detection
-    double t = (double)cv::getTickCount();
-    vector<cv::Point2f> corners;
-    cv::goodFeaturesToTrack(img, corners, maxCorners, qualityLevel, minDistance, cv::Mat(), blockSize, false, k);
+    std::vector<cv::Point2f> corners;
+    cv::goodFeaturesToTrack(img, corners, maxCorners, qualityLevel, minDistance, 
+                           cv::Mat(), blockSize, useHarrisDetector, k);
 
-    // add corners to result vector
-    for (auto it = corners.begin(); it != corners.end(); ++it)
-    {
-
-        cv::KeyPoint newKeyPoint;
-        newKeyPoint.pt = cv::Point2f((*it).x, (*it).y);
-        newKeyPoint.size = blockSize;
-        keypoints.push_back(newKeyPoint);
+    // Convert corners to KeyPoint format
+    for (auto& corner : corners) {
+        cv::KeyPoint kp(corner, 1.0f);
+        keypoints.push_back(kp);
     }
-    t = ((double)cv::getTickCount() - t) / cv::getTickFrequency();
-    cout << "Shi-Tomasi detection with n=" << keypoints.size() << " keypoints in " << 1000 * t / 1.0 << " ms" << endl;
 
-    // visualize results
-    if (bVis)
-    {
+    if (bVis) {
         cv::Mat visImage = img.clone();
         cv::drawKeypoints(img, keypoints, visImage, cv::Scalar::all(-1), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
-        string windowName = "Shi-Tomasi Corner Detector Results";
+        std::string windowName = "Shi-Tomasi Corner Detector Results";
         cv::namedWindow(windowName, 6);
-        imshow(windowName, visImage);
+        cv::imshow(windowName, visImage);
+        cv::waitKey(0);
+    }
+}
+
+void detKeypointsHarris(std::vector<cv::KeyPoint>& keypoints, cv::Mat& img, bool bVis)
+{
+    // Harris corner detection parameters
+    int maxCorners = 1000;
+    double qualityLevel = 0.01;
+    double minDistance = 10;
+    int blockSize = 3;
+    bool useHarrisDetector = true;
+    double k = 0.04;
+
+    std::vector<cv::Point2f> corners;
+    cv::goodFeaturesToTrack(img, corners, maxCorners, qualityLevel, minDistance, 
+                           cv::Mat(), blockSize, useHarrisDetector, k);
+
+    // Convert corners to KeyPoint format
+    for (auto& corner : corners) {
+        cv::KeyPoint kp(corner, 1.0f);
+        keypoints.push_back(kp);
+    }
+
+    if (bVis) {
+        cv::Mat visImage = img.clone();
+        cv::drawKeypoints(img, keypoints, visImage, cv::Scalar::all(-1), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
+        std::string windowName = "Harris Corner Detector Results";
+        cv::namedWindow(windowName, 6);
+        cv::imshow(windowName, visImage);
+        cv::waitKey(0);
+    }
+}
+
+void detKeypointsModern(std::vector<cv::KeyPoint>& keypoints, cv::Mat& img, std::string detectorType, bool bVis)
+{
+    cv::Ptr<cv::FeatureDetector> detector;
+
+    if (detectorType.compare("FAST") == 0) {
+        detector = cv::FastFeatureDetector::create();
+    }
+    else if (detectorType.compare("BRISK") == 0) {
+        detector = cv::BRISK::create();
+    }
+    else if (detectorType.compare("ORB") == 0) {
+        detector = cv::ORB::create();
+    }
+    else if (detectorType.compare("AKAZE") == 0) {
+        detector = cv::AKAZE::create();
+    }
+    else if (detectorType.compare("SIFT") == 0) {
+        detector = cv::SIFT::create();
+    }
+    else {
+        throw std::invalid_argument("Unknown detector type: " + detectorType);
+    }
+
+    detector->detect(img, keypoints);
+
+    if (bVis) {
+        cv::Mat visImage = img.clone();
+        cv::drawKeypoints(img, keypoints, visImage, cv::Scalar::all(-1), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
+        std::string windowName = detectorType + " Detector Results";
+        cv::namedWindow(windowName, 6);
+        cv::imshow(windowName, visImage);
         cv::waitKey(0);
     }
 }
