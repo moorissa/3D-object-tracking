@@ -122,35 +122,58 @@ Frame Number : 4 TTC Lidar : 16.689386 s, TTC Camera : 12.828827 s
 Press key to continue to next frame
 ...
 ```
-<img src="images/results/2025-06-13-3D-object-tracking-output.jpg" width="700" height="225" />
+<img src="results/2025-06-13-3D-object-tracking-output.jpg" width="700" height="225" />
 
 
 ## 5. Evaluation <a name="eval"></a>
+Here we tweak a bit the `FinalProject_Camera.cpp` to easily iterate through combinations of detectors and descriptors. Let's call the file `FinalProject_Camera_compare.cpp`. Its output can be found in [ttc_analysis_results.csv](results/ttc_analysis_results.csv), which shows camera-based TTC estimations of all combinations tested. The results are then massaged further using Python script [`2025_06_14_plots_and_analysis.ipynb`](src/2025_06_14_plots_and_analysis.ipynb)) or [this notebook link](https://colab.research.google.com/drive/1JaFzd7fTuj-zjOB3ilS6ukK-HYRJ_mMm?usp=sharing) to summarize performance of these combinations, as seen below. 
 
-Last but not least, various tests with different detector/descriptor combinations were conducted using the same framework. The table below shows camera-based TTC estimations of all combinations tested. Some unstable results (indicated in orange) are spotted and those faulty estimations appear quite often for particular detector types, like FAST, BRISK, and ORB. Some detector types are also more prone to produce clearly wrong results (indicated in red), like HARRIS and ORB. Those faults could be a result of keypoint detection and matching process.
+```python
+===============================================================
+TTC ANALYSIS SUMMARY - TOP 10 PERFORMERS
+================================================================================
+ Rank     Combination   MAE  RMSE  Relative_Error_%  Stability_StdDev  Success_Rate_%  Outlier_Rate_%  Avg_Keypoints  Avg_Matches
+    1      FAST+BRISK 1.609 1.941            14.922             0.870           100.0           0.000       5282.333     2241.000
+    2      FAST+FREAK 1.609 1.941            14.922             0.870           100.0           0.000       5282.333     2241.000
+    3      FAST+BRIEF 1.609 1.941            14.922             0.870           100.0           0.000       5282.333     2241.000
+    4        FAST+ORB 1.607 1.978            14.723             1.095           100.0           0.000       5282.333     2853.056
+    5      SIFT+FREAK 0.870 1.130             7.353             2.696           100.0           0.000       1983.056      774.667
+    6      SIFT+BRIEF 0.870 1.130             7.353             2.696           100.0           0.000       1983.056      774.667
+    7      SIFT+BRISK 0.870 1.130             7.353             2.696           100.0           0.000       1983.056      774.667
+    8     AKAZE+AKAZE 1.601 1.953            14.328             2.153           100.0           0.000       1548.000     1120.556
+    9 SHITOMASI+BRISK 2.071 2.464            19.229             1.411           100.0           6.667        838.600      365.000
+   10 SHITOMASI+BRIEF 2.071 2.464            19.229             1.411           100.0           6.667        838.600      365.000
 
-Take the estimation results particularly on two detector/descriptor combinations - *SHITOMASI/SIFT* and *ORB/SIFT*. The estimation based on *ORB/SIFT* combination is clearly a wrong value (623.139s), and it could be cause by the limited number of keypoints/matches detected. As a comparison, *SHITOMASI/SIFT* combination produces a reasonable TTC estimation (12.190s) where it detects 30% more keypionts/matches.
+==================================================
+WORST 5 PERFORMERS
+==================================================
+ Rank Combination    MAE   RMSE  Relative_Error_%  Stability_StdDev  Success_Rate_%  Outlier_Rate_%  Avg_Keypoints  Avg_Matches
+   24 BRISK+BRIEF  4.145  5.178            36.292             4.099           100.0          33.333       2988.389     1580.167
+   25   ORB+BRISK  9.570 16.233            79.459            14.810           100.0          40.000        500.000      311.600
+   26   ORB+BRIEF  9.570 16.233            79.459            14.810           100.0          40.000        500.000      311.600
+   27   ORB+FREAK  9.570 16.233            79.459            14.810           100.0          40.000        500.000      311.600
+   28     ORB+ORB 12.843 17.966           116.737            13.011           100.0          66.667        500.000      326.111
 
-```bash
-# ORB/SIFT outputs on Img-14
-ORB detector with n=500 keypoints in 13.6058 ms
-ORB detector with n=96 keypoints in the rectangle ROI
-MAT_BF matching produced n=95 matches in 0.463706 ms
-TTC Estimation: 623.139s
-
-# SHITOMASI/SIFT outputs on Img-14
-Shi-Tomasi detection with n=1886 keypoints in 13.5002 ms
-SHITOMASI detector with n=127 keypoints in the rectangle ROI
-MAT_BF matching produced n=138 matches in 1.32935 ms
-TTC Estimation: 12.190s
+Best performer: FAST+BRISK (MAE: 1.609s)
+Worst performer: ORB+ORB (MAE: 12.843s)
+Most stable: FAST+BRIEF (StdDev: 0.870s)
+Highest success rate: AKAZE+AKAZE (100.0%)
+Creating visualizations...
+Visualizations saved to ttc_analysis_plots/
 ```
 
-Based on the above analysis, the results generated by SHITOMASI detector shows higher confidence. The 5 SHITOMASI detector test results were then averaged out across 18 frames to produce the camera-based TTC estimation. The Lidar-based estimation was also compared with the SHITOMASI outputs frame by frame. Two Lidar results are questionable (indicated in orange) because their values are almost doubled compared to the previous frames. A more robust way of filtering out outlier Lidar points would be helpful to mitigate the faulty Lidar-based estimation.
+It seems like some unstable results are spotted and those faulty estimations appear quite often for particular detector types, like FAST, BRISK, and ORB. Some detector types are also more prone to produce clearly wrong results, like HARRIS and ORB. Those faults could be a result of keypoint detection and matching process.
 
-<!-- <img src="images/results/ttc-estimations.gif" width="900" height="300" /> -->
+Based on the above analysis, `FAST` combinations perform the highest (with the smallest RMSE), and the winner combination is `FAST + BRISK/FREAK/BRIEF` detector/descriptor pair at MAE of 1.609, while `ORB`s give the worst performing combinations. See below for resulting plots.
 
 
-## 5. Ackowledgements <a name="acknowledgements"></a>
+<img src="results/ttc_analysis_plots/ranking_mae.png" width="580" height="400" />
+<img src="results/ttc_analysis_plots/best_correlation.png" width="520" height="400" />
+<img src="results/ttc_analysis_plots/frame_comparison.png" width="580" height="400" />
+<img src="results/ttc_analysis_plots/success_vs_accuracy.png" width="520" height="400" />
+
+
+## 6. Ackowledgements <a name="acknowledgements"></a>
 * [Udacity Sensor Fusion Program](https://www.udacity.com/course/sensor-fusion-engineer-nanodegree--nd313)
 
 For any questions or feedback, feel free to email [moorissa.tjokro@columbia.edu](mailto:moorissa.tjokro@columbia.edu).
